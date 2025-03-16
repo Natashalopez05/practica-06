@@ -1,0 +1,118 @@
+version: '3.8'
+services:
+  h2:
+    image: oscarfonts/h2
+    container_name: h2_db
+    networks:
+      - backend_network
+    environment:
+      - H2_OPTIONS=-tcp -tcpAllowOthers -ifNotExists -web -webAllowOthers -webPort ${H2_WEB_PORT:-8082} -ifNotExists -baseDir ${H2_DB_PATH:-/h2-data}
+      - H2_DATA_PATH=${H2_DB_PATH:-/h2-data}
+      - H2_WEB_PORT=${H2_WEB_PORT:-8082}
+    volumes:
+      - h2_data:${H2_DB_PATH:-/h2-data}
+    ports:
+      - "${H2_WEB_PORT:-8082}:8082"
+    restart: unless-stopped
+
+  app1:
+   # image: natashalop/practica-4-spring_app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app1
+    networks:
+      - backend_network
+    depends_on:
+      - h2
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:h2:tcp://h2_db:${H2_PORT:-1521}/${DB_NAME:-./h2-data/testdb}
+      - SPRING_DATASOURCE_DRIVERCLASSNAME=${DB_DRIVER:-org.h2.Driver}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER:-sa}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-}
+      - SPRING_H2_CONSOLE_ENABLED=${H2_CONSOLE_ENABLED:-true}
+      - SPRING_H2_CONSOLE_PATH=${H2_CONSOLE_PATH:-/h2-console}
+      - SERVER_PORT=8081
+      - INSTANCE_ID=spring_app_1  # Identificador único para esta instancia
+    ports:
+      - "8081:8081"  # Mapeamos puertos distintos para cada instancia
+    restart: unless-stopped
+
+  app2:
+   # image: natashalop/practica-4-spring_app:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: app2
+    networks:
+      - backend_network
+    depends_on:
+      - h2
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:h2:tcp://h2_db:${H2_PORT:-1521}/${DB_NAME:-./h2-data/testdb}
+      - SPRING_DATASOURCE_DRIVERCLASSNAME=${DB_DRIVER:-org.h2.Driver}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER:-sa}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-}
+      - SPRING_H2_CONSOLE_ENABLED=${H2_CONSOLE_ENABLED:-true}
+      - SPRING_H2_CONSOLE_PATH=${H2_CONSOLE_PATH:-/h2-console}
+      - SERVER_PORT=8083
+      - INSTANCE_ID=spring_app_2
+    ports:
+      - "8083:8083"
+    restart: unless-stopped
+
+  app3:
+#    image: natashalop/practica-4-spring_app:latest
+    build:
+        context: .
+        dockerfile: Dockerfile
+    container_name: app3
+    networks:
+      - backend_network
+    depends_on:
+      - h2
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:h2:tcp://h2_db:${H2_PORT:-1521}/${DB_NAME:-./h2-data/testdb}
+      - SPRING_DATASOURCE_DRIVERCLASSNAME=${DB_DRIVER:-org.h2.Driver}
+      - SPRING_DATASOURCE_USERNAME=${DB_USER:-sa}
+      - SPRING_DATASOURCE_PASSWORD=${DB_PASSWORD:-}
+      - SPRING_H2_CONSOLE_ENABLED=${H2_CONSOLE_ENABLED:-true}
+      - SPRING_H2_CONSOLE_PATH=${H2_CONSOLE_PATH:-/h2-console}
+      - SERVER_PORT=8084
+      - INSTANCE_ID=spring_app_3
+    ports:
+      - "8084:8084"
+    restart: unless-stopped
+
+  haproxy:
+    image: haproxy:latest
+    container_name: haproxy
+    networks:
+      - backend_network
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro  # Montamos el archivo de config
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - app1
+      - app2
+      - app3
+
+    restart: unless-stopped
+
+  redis:  # Opcional, para sesiones distribuidas
+    image: redis:latest
+    container_name: redis
+    networks:
+      - backend_network
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+
+networks:
+  backend_network:
+    driver: bridge
+
+volumes:
+  h2_data:
